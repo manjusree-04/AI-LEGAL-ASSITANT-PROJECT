@@ -1,0 +1,26 @@
+# Core framework
+flask==3.0.3
+python-dotenv==1.0.1
+
+# LangChain ecosystem
+langchain==0.2.14
+langchain-core==0.2.38
+langchain-community==0.2.12
+langchain-text-splitters==0.2.2
+langchain-chroma==0.1.4
+
+# Vector DB (compatible with langchain-chroma)
+chromadb==0.5.11
+
+# Ollama integration (for LLaMA 3.2 or other Ollama models)
+ollama==0.1.9
+
+# Dependencies for Chroma / JSON schema
+pydantic==2.8.2
+pydantic-core==2.20.1
+jsonschema==4.23.0
+referencing==0.35.1
+
+# File parsing
+pypdf==4.2.0
+docx2txt==0.8

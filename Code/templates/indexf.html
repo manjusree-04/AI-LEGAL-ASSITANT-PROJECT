@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legal AI Assistant</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(to bottom, #d1d5db, #e5e7eb);
+        }
+        .chat-messages {
+            height: 500px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 16px;
+        }
+        .message {
+            max-width: 80%;
+            padding: 10px 16px;
+            border-radius: 1.5rem;
+            word-wrap: break-word;
+        }
+        .user-message {
+            background-color: #1e40af;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 0.5rem;
+        }
+        .ai-message {
+            background-color: #e5e7eb;
+            color: #1f2937;
+            align-self: flex-start;
+            border-bottom-left-radius: 0.5rem;
+        }
+        .ai-message a {
+            color: #1d4ed8;
+            text-decoration: underline;
+        }
+        #upload-status {
+            margin-top: 10px;
+            font-size: 0.875rem;
+            color: #10b981;
+        }
+        /* Modal styles */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 10% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="bg-white rounded-xl shadow-lg w-full max-w-4xl flex flex-col md:flex-row h-[90vh] overflow-hidden">
+        <div class="w-full md:w-1/4 p-6 bg-gray-50 border-r border-gray-200 flex flex-col">
+            <h2 class="text-xl font-bold mb-4 text-gray-800">Legal AI Assistant</h2>
+            <nav class="flex-grow">
+                <ul class="space-y-2">
+                    <li><a href="#" class="block p-3 rounded-lg bg-gray-200 text-gray-900 font-semibold hover:bg-gray-300 transition-colors duration-200">Chat with a Document</a></li>
+                    <li><a href="#" id="extract-clause-btn" class="block p-3 rounded-lg text-gray-600 font-semibold hover:bg-gray-200 transition-colors duration-200">Extract Key Legal Clauses</a></li>
+                    <li><a href="#" id="write-document-btn" class="block p-3 rounded-lg text-gray-600 font-semibold hover:bg-gray-200 transition-colors duration-200">Write a Legal Document</a></li>
+                    <li><a href="#" id="find-advocates-btn" class="block p-3 rounded-lg text-gray-600 font-semibold hover:bg-gray-200 transition-colors duration-200">Find Nearby Advocates</a></li>
+                    <li><a href="#" id="send-mail-btn" class="block p-3 rounded-lg text-gray-600 font-semibold hover:bg-gray-200 transition-colors duration-200">Send Legal Mail</a></li>
+                </ul>
+            </nav>
+            <div class="mt-auto">
+                <a href="/logout" class="block w-full text-center p-3 rounded-lg text-white bg-red-500 hover:bg-red-600 transition-colors duration-200 font-semibold">Logout</a>
+            </div>
+        </div>
+        <div class="w-full md:w-3/4 flex flex-col p-6">
+            <div class="flex items-center space-x-4 mb-6">
+                <label for="file-upload" class="cursor-pointer bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L6.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                    </svg>
+                    Upload Document
+                </label>
+                <input id="file-upload" type="file" class="hidden" accept=".pdf,.docx">
+                <span id="upload-status" class="text-sm">No document uploaded.</span>
+            </div>
+            
+            <div id="chat-messages" class="chat-messages flex-grow bg-white rounded-lg shadow-inner border border-gray-200 mb-4">
+                <div class="message ai-message shadow-md">
+                    <p>Hello! I'm your Legal AI Assistant. Upload a document to get started or choose an option from the left sidebar.</p>
+                </div>
+            </div>
+
+            <div class="flex space-x-4">
+                <input type="text" id="user-input" placeholder="Ask a question about the document..." class="flex-grow p-3 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 shadow-sm" disabled>
+                <button id="send-btn" class="bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors duration-200 shadow-md" disabled>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="sendMailModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="close-send-modal">&times;</span>
+            <h2 class="text-2xl font-bold mb-4">Draft a Legal Notice</h2>
+            <div class="space-y-4">
+                <div>
+                    <label for="your-name" class="block text-sm font-medium text-gray-700">Your Name</label>
+                    <input type="text" id="your-name" placeholder="Your Name" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label for="your-address" class="block text-sm font-medium text-gray-700">Your Address</label>
+                    <input type="text" id="your-address" placeholder="Your Address" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label for="recipient-email" class="block text-sm font-medium text-gray-700">Recipient's Email</label>
+                    <input type="email" id="recipient-email" placeholder="example@domain.com" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label for="issue-description" class="block text-sm font-medium text-gray-700">Describe the Legal Issue</label>
+                    <textarea id="issue-description" rows="6" placeholder="Briefly describe the problem you are facing and who is responsible..." class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"></textarea>
+                </div>
+                <button id="draft-mail-btn" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors duration-200">Draft Letter</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="reviewMailModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" id="close-review-modal">&times;</span>
+            <h2 class="text-2xl font-bold mb-4">Review and Send</h2>
+            <div class="space-y-4">
+                <p>Please review the draft below before sending.</p>
+                <textarea id="letter-content" rows="15" class="w-full p-4 border border-gray-300 rounded-md font-mono text-sm" readonly></textarea>
+                <button id="send-mail-submit-btn" class="w-full bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors duration-200">Accept & Send</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const fileInput = document.getElementById('file-upload');
+        const uploadStatus = document.getElementById('upload-status');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const chatMessages = document.getElementById('chat-messages');
+        const extractClauseBtn = document.getElementById('extract-clause-btn');
+        const writeDocumentBtn = document.getElementById('write-document-btn');
+        const findAdvocatesBtn = document.getElementById('find-advocates-btn');
+        const sendMailBtn = document.getElementById('send-mail-btn');
+        
+        const sendMailModal = document.getElementById('sendMailModal');
+        const reviewMailModal = document.getElementById('reviewMailModal');
+        const closeSendModalBtn = document.getElementById('close-send-modal');
+        const closeReviewModalBtn = document.getElementById('close-review-modal');
+        const draftMailBtn = document.getElementById('draft-mail-btn');
+        const sendMailSubmitBtn = document.getElementById('send-mail-submit-btn');
+        const letterContentArea = document.getElementById('letter-content');
+
+        let currentMode = 'chat';
+        let recipientEmailCache = '';
+
+        function addMessage(text, isUser) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user-message' : 'ai-message'} shadow-md`;
+            messageDiv.innerHTML = `<p>${text}</p>`;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        async function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+            uploadStatus.textContent = '⏳ Uploading and processing...';
+            addMessage(`Uploading and processing document: ${file.name}...`, true);
+            
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                if (response.ok) {
+                    uploadStatus.textContent = data.message;
+                    userInput.disabled = false;
+                    sendBtn.disabled = false;
+                    addMessage('✅ Document processed! You can now ask questions about it.', false);
+                } else {
+                    uploadStatus.textContent = `❌ ${data.error}`;
+                    addMessage(`❌ Upload failed: ${data.error}`, false);
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                uploadStatus.textContent = `❌ An error occurred during upload.`;
+                addMessage('❌ An error occurred during upload. Please try again.', false);
+            }
+        }
+
+        async function performChat(query) {
+            addMessage(query, true);
+            userInput.value = '';
+            
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ query: query })
+                });
+                const data = await response.json();
+                addMessage(data.response, false);
+            } catch (error) {
+                console.error('Chat error:', error);
+                addMessage('❌ Sorry, something went wrong. Please try again.', false);
+            }
+        }
+
+        async function performExtraction(clauseType) {
+            addMessage(`Extracting the '${clauseType}' clause.`, true);
+            userInput.value = '';
+            
+            try {
+                const response = await fetch('/extract_clause', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ clause_type: clauseType })
+                });
+                const data = await response.json();
+                addMessage(data.response.replace(/\n/g, '<br/>'), false);
+            } catch (error) {
+                console.error('Extraction error:', error);
+                addMessage('❌ Sorry, something went wrong during extraction. Please try again.', false);
+            }
+        }
+        
+        async function performDocumentGeneration(docType) {
+            addMessage(`Generating a boilerplate for a ${docType}.`, true);
+            userInput.value = '';
+            
+            try {
+                const response = await fetch('/generate_document', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ docType: docType })
+                });
+                const data = await response.json();
+                addMessage(data.document.replace(/\n/g, '<br/>'), false);
+            } catch (error) {
+                console.error('Document generation error:', error);
+                addMessage('❌ Sorry, something went wrong during document generation. Please try again.', false);
+            }
+        }
+
+        async function findAdvocates(location, specialty) {
+            addMessage(`Finding advocates in ${location} specializing in ${specialty || 'any area'}.`, true);
+
+            try {
+                const response = await fetch('/find_advocates', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ location, specialty })
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    if (data.advocates && data.advocates.length > 0) {
+                        let advocateListHtml = `<p>I found these legal advocates for you:</p><ul>`;
+                        data.advocates.forEach(adv => {
+                            advocateListHtml += `<li class="my-2 p-3 bg-white rounded-lg shadow-sm">
+                                <strong>${adv.name}</strong> - ${adv.experience} experience<br>
+                                <em>Areas:</em> ${adv.areas.join(', ')}<br>
+                                ${adv.phone ? `<em>Phone:</em> ${adv.phone}<br>` : ''}
+                                ${adv.email ? `<em>Email:</em> ${adv.email}<br>` : ''}
+                            </li>`;
+                        });
+                        advocateListHtml += `</ul>`;
+                        addMessage(advocateListHtml, false);
+                    } else {
+                        addMessage("Sorry, I couldn't find any advocates for that location/specialty. Please try a different search.", false);
+                    }
+                } else {
+                    addMessage(`❌ Search failed: ${data.error}`, false);
+                }
+            } catch (error) {
+                console.error('Find advocates error:', error);
+                addMessage('❌ An error occurred while searching for advocates. Please try again.', false);
+            }
+        }
+
+        // New function to draft the letter
+        async function draftAndShowMail(recipientEmail, issue, senderName, senderAddress) {
+            addMessage('Drafting your legal letter. Please wait...', true);
+            draftMailBtn.disabled = true;
+            draftMailBtn.textContent = 'Drafting...';
+
+            try {
+                const response = await fetch('/draft_legal_mail', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        issue: issue, 
+                        recipient_email: recipientEmail,
+                        sender_name: senderName,
+                        sender_address: senderAddress
+                    })
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    letterContentArea.value = data.letter_content;
+                    sendMailModal.style.display = 'none';
+                    reviewMailModal.style.display = 'block';
+                } else {
+                    addMessage(`❌ Drafting failed: ${data.error}`, false);
+                    sendMailModal.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Drafting error:', error);
+                addMessage('❌ An unexpected error occurred while drafting the letter. Please try again.', false);
+            } finally {
+                draftMailBtn.disabled = false;
+                draftMailBtn.textContent = 'Draft Letter';
+            }
+        }
+        
+        // New function to send the final mail
+        async function sendFinalMail(recipientEmail, letterContent) {
+            addMessage('Sending your legal letter. Please wait...', true);
+            sendMailSubmitBtn.disabled = true;
+            sendMailSubmitBtn.textContent = 'Sending...';
+
+            try {
+                const response = await fetch('/send_legal_mail', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        recipient_email: recipientEmail, 
+                        letter_content: letterContent
+                    })
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    addMessage(data.message, false);
+                } else {
+                    addMessage(`❌ Mail failed to send: ${data.error}`, false);
+                }
+            } catch (error) {
+                console.error('Mail send error:', error);
+                addMessage('❌ An unexpected error occurred while sending the mail. Please try again.', false);
+            } finally {
+                sendMailSubmitBtn.disabled = false;
+                sendMailSubmitBtn.textContent = 'Accept & Send';
+                reviewMailModal.style.display = 'none';
+            }
+        }
+
+        // Event Listeners
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                uploadFile(file);
+            }
+        });
+
+        sendBtn.addEventListener('click', () => {
+            const query = userInput.value.trim();
+            if (query) {
+                if (currentMode === 'chat') {
+                    performChat(query);
+                } else if (currentMode === 'extract') {
+                    performExtraction(query);
+                } else if (currentMode === 'generate') {
+                    performDocumentGeneration(query);
+                }
+            }
+        });
+        
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendBtn.click();
+            }
+        });
+
+        extractClauseBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            currentMode = 'extract';
+            userInput.placeholder = "What kind of clause would you like to extract? (e.g., 'Termination Clause')";
+            addMessage("Please enter the name of the clause you'd like to extract from the document.", false);
+        });
+
+        writeDocumentBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            currentMode = 'generate';
+            userInput.placeholder = "What document would you like to generate? (e.g., 'Non-disclosure Agreement')";
+            addMessage("What legal document boilerplate would you like to generate?", false);
+        });
+
+        findAdvocatesBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const location = prompt("Please enter your location:");
+            const specialty = prompt("Enter a legal specialty (optional):");
+            if (location) {
+                findAdvocates(location, specialty);
+            }
+        });
+        
+        sendMailBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            sendMailModal.style.display = 'block';
+        });
+        
+        closeSendModalBtn.addEventListener('click', () => {
+            sendMailModal.style.display = 'none';
+        });
+
+        closeReviewModalBtn.addEventListener('click', () => {
+            reviewMailModal.style.display = 'none';
+        });
+
+        window.onclick = function(event) {
+            if (event.target === sendMailModal) {
+                sendMailModal.style.display = 'none';
+            }
+            if (event.target === reviewMailModal) {
+                reviewMailModal.style.display = 'none';
+            }
+        };
+
+        // Event listener for the "Draft" button in the first modal
+        draftMailBtn.addEventListener('click', () => {
+            const recipientEmail = document.getElementById('recipient-email').value;
+            const issue = document.getElementById('issue-description').value;
+            const senderName = document.getElementById('your-name').value;
+            const senderAddress = document.getElementById('your-address').value;
+
+            if (recipientEmail && issue && senderName && senderAddress) {
+                recipientEmailCache = recipientEmail; // Cache the email for the next step
+                draftAndShowMail(recipientEmail, issue, senderName, senderAddress);
+            } else {
+                alert('Please fill out all fields.');
+            }
+        });
+
+        // Event listener for the "Accept & Send" button in the second modal
+        sendMailSubmitBtn.addEventListener('click', () => {
+            const finalLetterContent = letterContentArea.value;
+            sendFinalMail(recipientEmailCache, finalLetterContent);
+        });
+    </script>
+</body>
+</html>

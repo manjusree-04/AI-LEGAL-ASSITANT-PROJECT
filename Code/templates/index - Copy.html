@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legal AI Assistant</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(to bottom, #d1d5db, #e5e7eb);
+        }
+        .chat-messages {
+            height: 500px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 16px;
+        }
+        .message {
+            max-width: 80%;
+            padding: 12px 20px;
+            border-radius: 1.5rem;
+            word-wrap: break-word;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .user-message {
+            background-color: #1e40af;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 0.5rem;
+        }
+        .ai-message {
+            background-color: #e5e7eb;
+            color: #374151;
+            align-self: flex-start;
+            border-bottom-left-radius: 0.5rem;
+        }
+        .spinner {
+            border: 2px solid #ccc;
+            border-top-color: #333;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="bg-white shadow-2xl rounded-2xl w-full max-w-4xl flex flex-col h-[80vh]">
+        
+        <!-- Header -->
+        <div class="p-6 border-b border-gray-200 bg-gray-50 rounded-t-2xl flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-gray-800">Legal AI Assistant ⚖️</h1>
+            <a href="/logout" class="text-sm text-gray-500 hover:text-red-500 transition-colors duration-200">Logout</a>
+        </div>
+
+        <!-- Document Upload Section -->
+        <div class="p-4 border-b border-gray-200 bg-gray-100">
+            <h2 class="text-lg font-semibold text-gray-700 mb-2">Upload Legal Document</h2>
+            <form id="uploadForm" enctype="multipart/form-data" class="flex flex-col sm:flex-row items-center gap-4">
+                <input type="file" id="fileInput" name="file" accept=".pdf,.docx" class="hidden" onchange="document.getElementById('fileName').textContent = this.files[0].name">
+                <label for="fileInput" class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition-all duration-300 shadow-lg text-sm">
+                    Choose File
+                </label>
+                <span id="fileName" class="text-gray-500 italic text-sm truncate max-w-[200px]">No file chosen</span>
+                <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-full transition-all duration-300 shadow-lg text-sm">
+                    Upload & Process
+                </button>
+            </form>
+            <p id="uploadStatus" class="mt-2 text-sm text-center italic"></p>
+        </div>
+
+        <!-- Chat Messages Container -->
+        <div id="chatMessages" class="chat-messages flex-grow">
+            <!-- Messages will be appended here -->
+        </div>
+
+        <!-- Chat Input & Controls -->
+        <div class="p-4 border-t border-gray-200 flex items-center gap-2 bg-gray-50 rounded-b-2xl">
+            <input type="text" id="chatInput" placeholder="Ask your legal question..." class="flex-grow p-3 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200 text-sm">
+            <button id="sendButton" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition-all duration-300 shadow-md">
+                Send
+            </button>
+            <button id="extractClauseButton" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-full transition-all duration-300 shadow-md">
+                Extract Clause
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const uploadForm = document.getElementById('uploadForm');
+        const chatMessages = document.getElementById('chatMessages');
+        const chatInput = document.getElementById('chatInput');
+        const sendButton = document.getElementById('sendButton');
+        const extractClauseButton = document.getElementById('extractClauseButton');
+        const uploadStatus = document.getElementById('uploadStatus');
+
+        function appendMessage(sender, text) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}-message`;
+            messageDiv.textContent = text;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function showThinkingMessage() {
+            const thinkingDiv = document.createElement('div');
+            thinkingDiv.className = 'message ai-message flex items-center gap-2';
+            thinkingDiv.innerHTML = '<span class="spinner"></span> <span>Typing...</span>';
+            chatMessages.appendChild(thinkingDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            return thinkingDiv;
+        }
+
+        async function performExtraction(clauseType) {
+            appendMessage('user', `Extracting ${clauseType} clauses...`);
+            chatInput.value = '';
+            
+            const aiThinkingDiv = showThinkingMessage();
+            aiThinkingDiv.innerHTML = '<span class="spinner"></span> <span>Searching document...</span>';
+
+            try {
+                const response = await fetch('/extract_clause', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ clause_type: clauseType })
+                });
+
+                const result = await response.json();
+                aiThinkingDiv.textContent = result.response;
+            } catch (error) {
+                aiThinkingDiv.textContent = 'Error: Failed to perform clause extraction.';
+            }
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        uploadForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fileInput = document.getElementById('fileInput');
+            if (!fileInput.files.length) {
+                uploadStatus.textContent = 'Please select a file first.';
+                uploadStatus.className = 'mt-2 text-sm text-center italic text-red-500';
+                return;
+            }
+
+            const formData = new FormData(uploadForm);
+            uploadStatus.textContent = 'Uploading and processing...';
+            uploadStatus.className = 'mt-2 text-sm text-center italic text-blue-500';
+
+            try {
+                const response = await fetch('/upload_document', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    uploadStatus.textContent = result.message;
+                    uploadStatus.className = 'mt-2 text-sm text-center italic text-green-600';
+                    appendMessage('ai', result.message);
+                } else {
+                    uploadStatus.textContent = `Error: ${result.error}`;
+                    uploadStatus.className = 'mt-2 text-sm text-center italic text-red-500';
+                }
+            } catch (error) {
+                uploadStatus.textContent = `Error: ${error.message}`;
+                uploadStatus.className = 'mt-2 text-sm text-center italic text-red-500';
+            }
+        });
+
+        sendButton.addEventListener('click', async () => {
+            const userQuery = chatInput.value.trim();
+            if (!userQuery) return;
+
+            appendMessage('user', userQuery);
+            chatInput.value = '';
+            
+            const aiThinkingDiv = showThinkingMessage();
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: userQuery })
+                });
+                
+                const result = await response.json();
+                
+                aiThinkingDiv.textContent = result.response;
+            } catch (error) {
+                aiThinkingDiv.textContent = 'Error: Failed to get a response from the AI.';
+            }
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        });
+
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                sendButton.click();
+            }
+        });
+
+        extractClauseButton.addEventListener('click', async () => {
+            const clauseType = chatInput.value.trim();
+            if (!clauseType) {
+                // If input is empty, offer suggestions in the chat window
+                const suggestionsDiv = document.createElement('div');
+                suggestionsDiv.className = 'message ai-message';
+                suggestionsDiv.innerHTML = `
+                    <p>What kind of clause would you like to extract? Try one of these:</p>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        <button class="suggestion-button bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-1 px-3 rounded-full text-sm transition-colors duration-200">Liability</button>
+                        <button class="suggestion-button bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-1 px-3 rounded-full text-sm transition-colors duration-200">Termination</button>
+                        <button class="suggestion-button bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-1 px-3 rounded-full text-sm transition-colors duration-200">Confidentiality</button>
+                    </div>
+                `;
+                chatMessages.appendChild(suggestionsDiv);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+
+                // Add event listeners to the new buttons
+                document.querySelectorAll('.suggestion-button').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        const selectedClause = e.target.textContent;
+                        performExtraction(selectedClause);
+                    });
+                });
+
+                return;
+            }
+            
+            // If input is not empty, proceed with the extraction
+            performExtraction(clauseType);
+        });
+    </script>
+</body>
+</html>

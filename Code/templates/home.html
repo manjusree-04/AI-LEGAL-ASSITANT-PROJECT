@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home - Legal AI Assistant</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #111;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #video-background {
+            position: fixed;
+            right: 0;
+            bottom: 0;
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            z-index: -1;
+            background-size: cover;
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 0;
+        }
+
+        .content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .home-card {
+            background: linear-gradient(135deg, #4d4dff 0%, #ff66b2 100%);
+        }
+        .cta-button {
+            background: linear-gradient(135deg, #ff66b2 0%, #4d4dff 100%);
+        }
+        .cta-button:hover {
+            background: linear-gradient(135deg, #4d4dff 0%, #ff66b2 100%);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center py-12">
+    <video autoplay loop muted playsinline id="video-background">
+        <source src="{{ url_for('static', filename='registrationbg.mp4') }}" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+    <div class="overlay"></div>
+
+    <div class="content home-card shadow-xl rounded-2xl w-full max-w-2xl p-8 text-center text-white flex flex-col items-center">
+        <h1 class="text-4xl font-bold text-white">Welcome, {{ username }}! ⚖️</h1>
+        <p class="text-gray-200 mt-2">You are logged in to the Legal AI Assistant.</p>
+
+        <div class="mt-8 flex flex-col space-y-4 w-full">
+            <a href="{{ url_for('assistant') }}" class="cta-button text-white font-bold py-3 px-6 rounded-full transition-all duration-300 shadow-md text-lg">
+                Go to the AI Assistant
+            </a>
+            <a href="{{ url_for('about') }}" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-6 rounded-full transition-all duration-300 shadow-md text-lg">
+                About the Project
+            </a>
+            <a href="{{ url_for('logout') }}" class="mt-4 text-red-200 hover:text-red-50 font-semibold transition-colors duration-200">
+                Log Out
+            </a>
+        </div>
+    </div>
+</body>
+</html>

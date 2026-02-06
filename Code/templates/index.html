@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Legal AI Platform</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            /* Updated path to your background image */
+            background-image: url('static/img/bg.png');
+            background-size: cover;
+            background-position: center center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+        }
+        .bg-dark-blue {
+            background-color: #0b0c1e;
+        }
+        .feature-card {
+            background-color: rgba(26, 27, 50, 0.8); /* Added some transparency to blend with the background */
+            border: 1px solid #2e2f4f;
+            transition: transform 0.3s, box-shadow 0.3s;
+            backdrop-filter: blur(5px); /* Frosted glass effect */
+        }
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body class="text-white min-h-screen">
+
+    <header class="py-6 px-4 md:px-8 flex justify-between items-center">
+        <h1 class="text-2xl font-extrabold text-blue-400">Legal AI</h1>
+        <nav class="space-x-4">
+            <a href="{{ url_for('login') }}" class="text-gray-300 hover:text-white transition-colors duration-200">Log In</a>
+            <a href="{{ url_for('register') }}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full transition-colors duration-200">Sign Up</a>
+<a href="{{ url_for('features') }}" class="text-white hover:text-pink-400 transition-colors duration-200">
+    Features
+</a>
+        </nav>
+    </header>
+
+    <section class="text-center py-20 px-4 md:px-8">
+        <h2 class="text-4xl sm:text-5xl md:text-6xl font-extrabold leading-tight text-white mb-4">
+        Experience the Future of <br> Legal Assistance
+        </h2>
+        <p class="text-gray-400 text-lg md:text-xl max-w-3xl mx-auto mb-8">
+            Leverage AI to streamline your legal document analysis, contract drafting, and compliance checks.
+            <br>
+            Secure, efficient, and tailored to your needs.
+        </p>
+        <a href="{{ url_for('login') }}" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-8 rounded-full text-lg transition-colors duration-200">
+            Get Started
+        </a>
+    </section>
+
+    <section class="py-16 px-4 md:px-8">
+        <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
+
+            <div class="feature-card rounded-xl p-8 text-center flex flex-col items-center">
+                <div class="mb-4">
+                    <img src="{{ url_for('static', filename='img/ai.png') }}" alt="Customer AI Workflow" class="mx-auto w-16 h-16">
+                </div>
+                <h3 class="text-2xl font-bold mb-2">Customer AI Workflow</h3>
+                <p class="text-gray-400 text-center flex-1">
+                    Streamline legal processes from start to finish. Our AI handles document ingestion, analysis, and information retrieval to save you time and effort.
+                </p>
+                <a href="#" class="mt-4 font-bold text-blue-400 hover:text-blue-300 transition-colors duration-200">
+                    LEARN MORE
+                </a>
+            </div>
+
+            <div class="feature-card rounded-xl p-8 text-center flex flex-col items-center">
+                <div class="mb-4">
+                    <img src="{{ url_for('static', filename='img/team.png') }}" alt="Collaborate with Team" class="mx-auto w-16 h-16">
+                </div>
+                <h3 class="text-2xl font-bold mb-2">Collaborate with Team</h3>
+                <p class="text-gray-400 text-center flex-1">
+                    Effortlessly share and collaborate on legal documents with your team in a secure environment. Maintain a clear and organized workflow for every project.
+                </p>
+                <a href="#" class="mt-4 font-bold text-blue-400 hover:text-blue-300 transition-colors duration-200">
+                    LEARN MORE
+                </a>
+            </div>
+
+            <div class="feature-card rounded-xl p-8 text-center flex flex-col items-center">
+                <div class="mb-4">
+                    <img src="{{ url_for('static', filename='img/billing.png') }}" alt="Tailored Billing & Usage" class="mx-auto w-16 h-16">
+                </div>
+                <h3 class="text-2xl font-bold mb-2">Smart Features</h3>
+                <p class="text-gray-400 text-center flex-1">
+                    Our AI platform learns and adapts to your preferences, delivering the most relevant tools, insights, and guidance — personalized to your journey.
+                </p>
+                <a href="#" class="mt-4 font-bold text-blue-400 hover:text-blue-300 transition-colors duration-200">
+                    LEARN MORE
+                </a>
+            </div>
+
+        </div>
+    </section>
+
+    <section class="py-16 px-4 md:px-8">
+        <div class="bg-dark-blue border border-gray-700 rounded-2xl p-8 md:p-12 text-center max-w-4xl mx-auto shadow-xl">
+            <h2 class="text-4xl font-extrabold mb-4">Ready to use the Legal AI Assistant?</h2>
+            <p class="text-gray-400 text-lg md:text-xl mb-8 max-w-2xl mx-auto">
+                Join thousands of legal professionals who are already transforming their workflow with the power of AI.
+            </p>
+            <a href="{{ url_for('login') }}" class="bg-orange-500 hover:bg-orange-600 text-white font-bold py-4 px-12 rounded-full text-xl transition-colors duration-200">
+                Get Started Today
+            </a>
+        </div>
+    </section>
+
+    <footer class="py-6 text-center text-gray-500 text-sm">
+        &copy; 2025 Legal AI Platform. All Rights Reserved.
+    </footer>
+
+</body>
+</html>
