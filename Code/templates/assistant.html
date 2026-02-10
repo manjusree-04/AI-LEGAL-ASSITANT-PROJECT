@@ -261,12 +261,20 @@
                     </div>
                 </div>
                 <form id="chatForm" class="mt-6 flex gap-4">
+                    <button type="button" id="voiceBtn" onclick="toggleVoiceRecording()" 
+                            class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-full transition-all duration-300 shadow-md">
+                        🎤
+                    </button>
                     <input type="text" id="chatInput" placeholder="Ask a question about the document..."
                            class="flex-1 px-4 py-3 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-pink-400 transition-all duration-200"
                     >
                     <button type="submit"
                             class="bg-pink-500 hover:bg-pink-600 text-white font-bold py-3 px-6 rounded-full transition-all duration-300 shadow-md">
                         Send
+                    </button>
+                    <button type="button" id="speakBtn" onclick="speakLastResponse()" 
+                            class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-full transition-all duration-300 shadow-md">
+                        🔊
                     </button>
                 </form>
             </main>
@@ -370,6 +378,7 @@
                     
                     const result = await response.json();
                     
+                    lastResponse = result.response; // Store for voice
                     aiThinkingDiv.textContent = result.response;
                     aiThinkingDiv.className = 'message ai-message shadow-md';
                     chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -619,6 +628,83 @@
                 }
             }
         });
+
+        // Voice Assistant Functions
+        let recognition;
+        let lastResponse = '';
+
+        function toggleVoiceRecording() {
+            const btn = document.getElementById('voiceBtn');
+            
+            // Use browser's built-in Web Speech API
+            if (!recognition) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SpeechRecognition) {
+                    alert('Speech recognition not supported in this browser. Try Chrome.');
+                    return;
+                }
+                
+                recognition = new SpeechRecognition();
+                recognition.lang = 'en-US';
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                
+                recognition.onresult = (event) => {
+                    const transcript = event.results[0][0].transcript;
+                    chatInput.value = transcript;
+                    btn.textContent = '🎤';
+                    btn.className = 'bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-full transition-all duration-300 shadow-md';
+                };
+                
+                recognition.onerror = (event) => {
+                    alert('Speech recognition error: ' + event.error);
+                    btn.textContent = '🎤';
+                    btn.className = 'bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-full transition-all duration-300 shadow-md';
+                };
+                
+                recognition.onend = () => {
+                    btn.textContent = '🎤';
+                    btn.className = 'bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-full transition-all duration-300 shadow-md';
+                };
+            }
+            
+            recognition.start();
+            btn.textContent = '⏹️';
+            btn.className = 'bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-full transition-all duration-300 shadow-md';
+        }
+
+        function speakLastResponse() {
+            if (!lastResponse) {
+                alert('No response to read');
+                return;
+            }
+            
+            const btn = document.getElementById('speakBtn');
+            if (btn.disabled) return; // Prevent multiple clicks
+            
+            btn.disabled = true;
+            btn.textContent = '⏳';
+            
+            fetch('/text_to_speech', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({text: lastResponse})
+            })
+            .then(res => res.blob())
+            .then(blob => {
+                const audio = new Audio(URL.createObjectURL(blob));
+                audio.onended = () => {
+                    btn.disabled = false;
+                    btn.textContent = '🔊';
+                };
+                audio.play();
+            })
+            .catch(err => {
+                alert('Text-to-speech failed');
+                btn.disabled = false;
+                btn.textContent = '🔊';
+            });
+        }
     </script>
 </body>
 </html>

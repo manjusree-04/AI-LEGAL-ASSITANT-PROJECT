@@ -1,0 +1,113 @@
+<!-- Add this to your assistant.html chat interface -->
+
+<!-- Voice Controls -->
+<div class="voice-controls" style="display: flex; gap: 10px; margin: 10px 0;">
+    <button id="voiceBtn" onclick="toggleVoiceRecording()" 
+            style="background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">
+        🎤 Voice Input
+    </button>
+    <button id="speakBtn" onclick="speakLastResponse()" 
+            style="background: #2196F3; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">
+        🔊 Read Aloud
+    </button>
+</div>
+
+<script>
+let mediaRecorder;
+let audioChunks = [];
+let lastResponse = '';
+
+// Start/Stop voice recording
+function toggleVoiceRecording() {
+    const btn = document.getElementById('voiceBtn');
+    
+    if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+        // Start recording
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => {
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    sendVoiceToServer(audioBlob);
+                };
+                
+                mediaRecorder.start();
+                btn.textContent = '⏹️ Stop Recording';
+                btn.style.background = '#f44336';
+            })
+            .catch(err => alert('Microphone access denied: ' + err));
+    } else {
+        // Stop recording
+        mediaRecorder.stop();
+        mediaRecorder.stream.getTracks().forEach(track => track.stop());
+        btn.textContent = '🎤 Voice Input';
+        btn.style.background = '#4CAF50';
+    }
+}
+
+// Send voice to backend
+function sendVoiceToServer(audioBlob) {
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'query.wav');
+    
+    fetch('/voice_to_text', {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.text) {
+            // Put text in query input
+            document.getElementById('queryInput').value = data.text;
+            // Auto-submit
+            sendQuery();
+        } else {
+            alert('Could not recognize speech');
+        }
+    })
+    .catch(err => alert('Voice recognition failed: ' + err));
+}
+
+// Speak the last response
+function speakLastResponse() {
+    if (!lastResponse) {
+        alert('No response to read');
+        return;
+    }
+    
+    fetch('/text_to_speech', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text: lastResponse})
+    })
+    .then(res => res.blob())
+    .then(blob => {
+        const audio = new Audio(URL.createObjectURL(blob));
+        audio.play();
+    })
+    .catch(err => alert('Text-to-speech failed: ' + err));
+}
+
+// Update your existing sendQuery function to store response
+function sendQuery() {
+    const query = document.getElementById('queryInput').value;
+    
+    fetch('/chat', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({query: query})
+    })
+    .then(res => res.json())
+    .then(data => {
+        lastResponse = data.response; // Store for voice
+        // Display response in your chat UI
+        displayResponse(data.response);
+    });
+}
+</script>

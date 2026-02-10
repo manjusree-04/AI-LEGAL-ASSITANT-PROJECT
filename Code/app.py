@@ -81,17 +81,29 @@ class User(db.Model):
     def __repr__(self):
         return f'<User {self.username}>'
 
+class Document(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    filename = db.Column(db.String(255), nullable=False)
+    file_path = db.Column(db.String(500), nullable=False)
+    severity = db.Column(db.String(500))
+    uploaded_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class ChatHistory(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    query = db.Column(db.Text, nullable=False)
+    response = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 
 # ==================== RAG Functions ====================
 rag_chain = None
 vectorstore = None
 case_severity = None
 llm = Ollama(model="llama3.2")
-# Use LegalBERT for better legal document embeddings
-embedding_model = HuggingFaceEmbeddings(
-    model_name="nlpaueb/legal-bert-base-uncased",
-    model_kwargs={'device': 'cpu'}
-)
+# Use Ollama embeddings for simplicity
+embedding_model = OllamaEmbeddings(model="llama3.2")
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200, length_function=len)
 def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
@@ -178,6 +190,22 @@ def process_document_and_ingest_to_db(file_path):
         return False
 
 # ==================== Search Advocates Function ====================
+def get_case_type_from_document(document_text):
+    """Extract case type from document using LLM"""
+    prompt = f"""
+    Analyze this legal document and identify the primary case type.
+    Respond with ONE of: Criminal, Civil, Corporate, Family Law, Employment, Real Estate, Commercial Law, Contracts
+    
+    Document: {document_text[:1500]}...
+    
+    Case Type:
+    """
+    try:
+        llm = Ollama(model="llama3.2")
+        return llm.invoke(prompt).strip()
+    except:
+        return "General"
+
 def search_advocates_data(location, query):
     """
     Simulates searching for advocates and returns a structured list.
@@ -295,6 +323,16 @@ def upload_document():
         success = process_document_and_ingest_to_db(file_path)
         if success:
             global case_severity
+            # Store in database
+            doc = Document(
+                user_id=session['user_id'],
+                filename=file.filename,
+                file_path=file_path,
+                severity=case_severity
+            )
+            db.session.add(doc)
+            db.session.commit()
+            
             return jsonify({
                 'message': '✅ Document uploaded & processed successfully!',
                 'severity': case_severity
@@ -325,6 +363,52 @@ def chat_with_ai():
             return jsonify({'response': f"📊 Case Severity Analysis: {case_severity}"}), 200
         else:
             return jsonify({'response': '⚠️ No severity analysis available. Please upload a document first.'}), 200
+    
+    # Handle lawyer recommendation queries
+    if any(word in query.lower() for word in ['lawyer', 'advocate', 'attorney', 'recommend', 'suggest']):
+        try:
+            doc = Document.query.filter_by(user_id=session['user_id']).order_by(Document.uploaded_at.desc()).first()
+            if not doc:
+                return jsonify({'response': '⚠️ Please upload a document first to get lawyer recommendations.'}), 200
+            
+            # Load document
+            if doc.file_path.endswith('.pdf'):
+                loader = PyPDFLoader(doc.file_path)
+            else:
+                loader = Docx2txtLoader(doc.file_path)
+            
+            documents = loader.load()
+            full_text = "\n".join([d.page_content for d in documents])
+            case_type = get_case_type_from_document(full_text)
+            
+            # Get matching advocates
+            all_advocates = search_advocates_data("", "")
+            recommended = []
+            for adv in all_advocates:
+                for area in adv['areas']:
+                    if case_type.lower() in area.lower() or area.lower() in case_type.lower():
+                        recommended.append(adv)
+                        break
+            
+            if not recommended:
+                recommended = all_advocates[:3]
+            
+            # Format response
+            response = f"📋 **Case Type:** {case_type}\n"
+            response += f"⚖️ **Severity:** {case_severity}\n\n"
+            response += "👨‍⚖️ **Recommended Lawyers:**\n\n"
+            for i, lawyer in enumerate(recommended[:5], 1):
+                response += f"{i}. **{lawyer['name']}**\n"
+                response += f"   Experience: {lawyer['experience']}\n"
+                response += f"   Specialization: {', '.join(lawyer['areas'])}\n"
+                response += f"   Phone: {lawyer['phone']}\n"
+                if 'email' in lawyer:
+                    response += f"   Email: {lawyer['email']}\n"
+                response += "\n"
+            
+            return jsonify({'response': response}), 200
+        except Exception as e:
+            return jsonify({'response': f'⚠️ Error getting recommendations: {str(e)}'}), 200
 
     try:
         response = rag_chain.invoke(query)
@@ -334,6 +418,15 @@ def chat_with_ai():
 
         if not response or response.strip() == "":
             response = "⚠️ No answer generated. Check if the LLM is running."
+        
+        # Store chat history
+        chat = ChatHistory(
+            user_id=session['user_id'],
+            query=query,
+            response=response
+        )
+        db.session.add(chat)
+        db.session.commit()
 
         return jsonify({'response': response}), 200
     except Exception as e:
@@ -432,6 +525,56 @@ def download_pdf():
     
     return send_file(buffer, as_attachment=True, download_name=f"{doc_type.replace(' ', '_')}.pdf", mimetype='application/pdf')
 
+@app.route('/recommend_lawyers', methods=['POST'])
+def recommend_lawyers():
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    global rag_chain, case_severity
+    
+    if rag_chain is None:
+        return jsonify({'error': 'Please upload a document first'}), 400
+    
+    try:
+        # Get document content
+        doc = Document.query.filter_by(user_id=session['user_id']).order_by(Document.uploaded_at.desc()).first()
+        if not doc:
+            return jsonify({'error': 'No document found'}), 400
+        
+        # Load document to extract case type
+        if doc.file_path.endswith('.pdf'):
+            loader = PyPDFLoader(doc.file_path)
+        else:
+            loader = Docx2txtLoader(doc.file_path)
+        
+        documents = loader.load()
+        full_text = "\n".join([d.page_content for d in documents])
+        case_type = get_case_type_from_document(full_text)
+        
+        # Get all advocates
+        all_advocates = search_advocates_data("", "")
+        
+        # Filter advocates by case type
+        recommended = []
+        for adv in all_advocates:
+            for area in adv['areas']:
+                if case_type.lower() in area.lower() or area.lower() in case_type.lower():
+                    recommended.append(adv)
+                    break
+        
+        # If no match, return all
+        if not recommended:
+            recommended = all_advocates[:3]
+        
+        return jsonify({
+            'case_type': case_type,
+            'severity': case_severity,
+            'recommended_lawyers': recommended
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': f'Failed to recommend lawyers: {str(e)}'}), 500
+
 @app.route('/find_advocates', methods=['POST'])
 def find_advocates():
     data = request.json
@@ -486,6 +629,40 @@ def draft_legal_mail():
     except Exception as e:
         print(f"❌ Drafting error: {e}")
         return jsonify({'error': f'Failed to draft letter: {str(e)}'}), 500
+
+@app.route('/admin/dashboard')
+def admin_dashboard():
+    return render_template('admin_dashboard.html')
+
+@app.route('/admin/data')
+def admin_data():
+    users = User.query.all()
+    documents = Document.query.all()
+    chats = ChatHistory.query.order_by(ChatHistory.created_at.desc()).limit(100).all()
+    
+    return jsonify({
+        'users': [{'id': u.id, 'username': u.username, 'email': u.email, 'address': u.address} for u in users],
+        'documents': [{'id': d.id, 'user_id': d.user_id, 'filename': d.filename, 'severity': d.severity, 'uploaded_at': d.uploaded_at.isoformat()} for d in documents],
+        'chats': [{'id': c.id, 'user_id': c.user_id, 'query': c.query, 'response': c.response, 'created_at': c.created_at.isoformat()} for c in chats]
+    }), 200
+
+@app.route('/get_chat_history', methods=['GET'])
+def get_chat_history():
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    chats = ChatHistory.query.filter_by(user_id=session['user_id']).order_by(ChatHistory.created_at.desc()).limit(50).all()
+    history = [{'query': c.query, 'response': c.response, 'time': c.created_at.isoformat()} for c in chats]
+    return jsonify({'history': history}), 200
+
+@app.route('/get_documents', methods=['GET'])
+def get_documents():
+    if 'user_id' not in session:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    docs = Document.query.filter_by(user_id=session['user_id']).order_by(Document.uploaded_at.desc()).all()
+    documents = [{'id': d.id, 'filename': d.filename, 'severity': d.severity, 'uploaded_at': d.uploaded_at.isoformat()} for d in docs]
+    return jsonify({'documents': documents}), 200
 
 @app.route('/get_severity', methods=['GET'])
 def get_case_severity():
@@ -561,21 +738,43 @@ def voice_to_text():
         return jsonify({'error': 'No audio file'}), 400
     
     audio_file = request.files['audio']
-    audio_path = os.path.join(app.config['UPLOAD_FOLDER'], f"voice_{session['user_id']}.wav")
+    temp_path = os.path.join(app.config['UPLOAD_FOLDER'], f"voice_{session['user_id']}_temp.webm")
+    wav_path = os.path.join(app.config['UPLOAD_FOLDER'], f"voice_{session['user_id']}.wav")
     
     try:
-        audio_file.save(audio_path)
-        # Use speech recognition
+        audio_file.save(temp_path)
+        
+        # Try to convert using pydub (requires ffmpeg)
+        try:
+            from pydub import AudioSegment
+            audio = AudioSegment.from_file(temp_path)
+            audio.export(wav_path, format="wav")
+        except:
+            # Fallback: try direct recognition on webm
+            import speech_recognition as sr
+            recognizer = sr.Recognizer()
+            with sr.AudioFile(temp_path) as source:
+                audio_data = recognizer.record(source)
+                text = recognizer.recognize_google(audio_data)
+            os.remove(temp_path)
+            return jsonify({'text': text}), 200
+        
+        # Use speech recognition on converted WAV
         import speech_recognition as sr
         recognizer = sr.Recognizer()
         
-        with sr.AudioFile(audio_path) as source:
+        with sr.AudioFile(wav_path) as source:
             audio_data = recognizer.record(source)
             text = recognizer.recognize_google(audio_data)
         
-        os.remove(audio_path)
+        os.remove(temp_path)
+        os.remove(wav_path)
         return jsonify({'text': text}), 200
     except Exception as e:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        if os.path.exists(wav_path):
+            os.remove(wav_path)
         return jsonify({'error': f'Speech recognition failed: {str(e)}'}), 500
 
 @app.route('/text_to_speech', methods=['POST'])
@@ -589,14 +788,19 @@ def text_to_speech():
     if not text:
         return jsonify({'error': 'No text provided'}), 400
     
+    audio_path = os.path.join(app.config['UPLOAD_FOLDER'], f"tts_{session['user_id']}.mp3")
+    
     try:
         from gtts import gTTS
-        audio_path = os.path.join(app.config['UPLOAD_FOLDER'], f"tts_{session['user_id']}.mp3")
+        
+        # Remove old file if exists
+        if os.path.exists(audio_path):
+            os.remove(audio_path)
         
         tts = gTTS(text=text, lang='en', slow=False)
         tts.save(audio_path)
         
-        return send_file(audio_path, mimetype='audio/mpeg', as_attachment=True, download_name='response.mp3')
+        return send_file(audio_path, mimetype='audio/mpeg', as_attachment=False, download_name='response.mp3')
     except Exception as e:
         return jsonify({'error': f'Text-to-speech failed: {str(e)}'}), 500
 

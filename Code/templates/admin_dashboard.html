@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Legal AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white p-8">
+    <div class="max-w-7xl mx-auto">
+        <h1 class="text-4xl font-bold mb-8">📊 Admin Dashboard</h1>
+        
+        <!-- Users Section -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold mb-4">👥 Registered Users</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead class="bg-gray-700">
+                        <tr>
+                            <th class="p-3">ID</th>
+                            <th class="p-3">Username</th>
+                            <th class="p-3">Email</th>
+                            <th class="p-3">Address</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTable">
+                        <!-- Data loaded via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Documents Section -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold mb-4">📄 Uploaded Documents</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead class="bg-gray-700">
+                        <tr>
+                            <th class="p-3">ID</th>
+                            <th class="p-3">User ID</th>
+                            <th class="p-3">Filename</th>
+                            <th class="p-3">Severity</th>
+                            <th class="p-3">Uploaded At</th>
+                        </tr>
+                    </thead>
+                    <tbody id="documentsTable">
+                        <!-- Data loaded via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Chat History Section -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-6">
+            <h2 class="text-2xl font-bold mb-4">💬 Chat History</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead class="bg-gray-700">
+                        <tr>
+                            <th class="p-3">ID</th>
+                            <th class="p-3">User ID</th>
+                            <th class="p-3">Query</th>
+                            <th class="p-3">Response</th>
+                            <th class="p-3">Time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="chatTable">
+                        <!-- Data loaded via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <a href="/" class="bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-lg inline-block">← Back to Home</a>
+    </div>
+
+    <script>
+        // Load admin data
+        fetch('/admin/data')
+            .then(res => res.json())
+            .then(data => {
+                // Users
+                const usersTable = document.getElementById('usersTable');
+                data.users.forEach(user => {
+                    usersTable.innerHTML += `
+                        <tr class="border-b border-gray-700">
+                            <td class="p-3">${user.id}</td>
+                            <td class="p-3">${user.username}</td>
+                            <td class="p-3">${user.email}</td>
+                            <td class="p-3">${user.address || 'N/A'}</td>
+                        </tr>
+                    `;
+                });
+
+                // Documents
+                const docsTable = document.getElementById('documentsTable');
+                data.documents.forEach(doc => {
+                    docsTable.innerHTML += `
+                        <tr class="border-b border-gray-700">
+                            <td class="p-3">${doc.id}</td>
+                            <td class="p-3">${doc.user_id}</td>
+                            <td class="p-3">${doc.filename}</td>
+                            <td class="p-3">${doc.severity || 'N/A'}</td>
+                            <td class="p-3">${new Date(doc.uploaded_at).toLocaleString()}</td>
+                        </tr>
+                    `;
+                });
+
+                // Chat History
+                const chatTable = document.getElementById('chatTable');
+                data.chats.forEach(chat => {
+                    chatTable.innerHTML += `
+                        <tr class="border-b border-gray-700">
+                            <td class="p-3">${chat.id}</td>
+                            <td class="p-3">${chat.user_id}</td>
+                            <td class="p-3">${chat.query.substring(0, 50)}...</td>
+                            <td class="p-3">${chat.response.substring(0, 50)}...</td>
+                            <td class="p-3">${new Date(chat.created_at).toLocaleString()}</td>
+                        </tr>
+                    `;
+                });
+            });
+    </script>
+</body>
+</html>
